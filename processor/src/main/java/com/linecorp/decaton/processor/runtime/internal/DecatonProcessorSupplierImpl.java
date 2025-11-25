@@ -16,8 +16,11 @@
 
 package com.linecorp.decaton.processor.runtime.internal;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import org.apache.kafka.common.TopicPartition;
@@ -26,6 +29,7 @@ import org.slf4j.LoggerFactory;
 
 import com.linecorp.decaton.processor.DecatonProcessor;
 import com.linecorp.decaton.processor.runtime.DecatonProcessorSupplier;
+import com.linecorp.decaton.processor.runtime.ProcessorProperties;
 import com.linecorp.decaton.processor.runtime.ProcessorScope;
 
 public class DecatonProcessorSupplierImpl<T> implements DecatonProcessorSupplier<T> {
@@ -37,6 +41,14 @@ public class DecatonProcessorSupplierImpl<T> implements DecatonProcessorSupplier
 
     public DecatonProcessorSupplierImpl(Supplier<DecatonProcessor<T>> supplier, ProcessorScope creationScope) {
         this.supplier = supplier;
+        this.creationScope = creationScope;
+        processors = new ConcurrentHashMap<>();
+    }
+
+    public DecatonProcessorSupplierImpl(Function<Supplier<ProcessorProperties>, DecatonProcessor<T>> processorConstructor,
+                                        Supplier<ProcessorProperties> processorPropertiesSupplier,
+                                        ProcessorScope creationScope) {
+        this.supplier = () -> processorConstructor.apply(processorPropertiesSupplier);
         this.creationScope = creationScope;
         processors = new ConcurrentHashMap<>();
     }

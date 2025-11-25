@@ -239,6 +239,14 @@ public class ProcessorProperties extends AbstractDecatonProperties {
             PropertyDefinition.define("decaton.retry.task.in.legacy.format", Boolean.class, false,
                                       v -> v instanceof Boolean);
 
+    public static final PropertyDefinition<Long> CONFIG_BATCHING_PROCESSOR_LINGER_MS =
+            PropertyDefinition.define("decaton.batching.processor.linger.ms", Long.class, 1000L,
+                                      v -> v instanceof Long && (Long) v >= 100);
+
+    public static final PropertyDefinition<Integer> CONFIG_BATCHING_PROCESSOR_CAPACITY =
+            PropertyDefinition.define("decaton.batching.processor.capacity", Integer.class, 100,
+                                      v -> v instanceof Integer && (Integer) v > 0);
+
     /**
      * Controls whether to parse records as {@link DecatonTaskRequest} format when task metadata header is missing
      * when {@link Deserializer} is used, instead of parsing task directly with the deserializer and
@@ -269,7 +277,9 @@ public class ProcessorProperties extends AbstractDecatonProperties {
                     CONFIG_PROCESSOR_THREADS_TERMINATION_TIMEOUT_MS,
                     CONFIG_PER_KEY_QUOTA_PROCESSING_RATE,
                     CONFIG_RETRY_TASK_IN_LEGACY_FORMAT,
-                    CONFIG_LEGACY_PARSE_FALLBACK_ENABLED));
+                    CONFIG_LEGACY_PARSE_FALLBACK_ENABLED,
+                    CONFIG_BATCHING_PROCESSOR_LINGER_MS,
+                    CONFIG_BATCHING_PROCESSOR_CAPACITY));
 
     /**
      * Find and return a {@link PropertyDefinition} from its name.

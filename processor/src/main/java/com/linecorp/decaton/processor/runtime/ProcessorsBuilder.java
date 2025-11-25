@@ -18,6 +18,7 @@ package com.linecorp.decaton.processor.runtime;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import com.linecorp.decaton.client.DecatonClient;
@@ -45,6 +46,7 @@ public class ProcessorsBuilder<T> {
     private final TaskExtractor<T> userSuppliedTaskExtractor;
 
     private final List<DecatonProcessorSupplier<T>> suppliers;
+    private ProcessorProperties processorProperties;
 
     ProcessorsBuilder(String topic, org.apache.kafka.common.serialization.Deserializer<T> userSuppliedDeserializer, TaskExtractor<T> userSuppliedTaskExtractor) {
         this.topic = topic;
@@ -140,7 +142,12 @@ public class ProcessorsBuilder<T> {
         return thenProcess(new DecatonProcessorSupplierImpl<>(() -> processor, ProcessorScope.PROVIDED));
     }
 
+    public ProcessorsBuilder<T> thenProcess(Function<Supplier<ProcessorProperties>, DecatonProcessor<T>> processorConstructor) {
+        return thenProcess(new DecatonProcessorSupplierImpl<>(processorConstructor,() -> processorProperties, ProcessorScope.PROVIDED));
+    }
+
     Processors<T> build(DecatonProcessorSupplier<byte[]> retryProcessorSupplier, ProcessorProperties properties) {
+        this.processorProperties = properties;
         Property<Boolean> legacyFallbackEnabledProperty = properties.get(ProcessorProperties.CONFIG_LEGACY_PARSE_FALLBACK_ENABLED);
 
         final TaskExtractor<T> taskExtractor;

@@ -43,26 +43,32 @@ public class BatchingProcessorTest {
     public void testBatchingProcessor() throws Exception {
         Random rand = randomExtension.random();
         ProcessorTestSuite
-            .builder(rule)
-            .configureProcessorsBuilder(builder -> builder.thenProcess(
-                new BatchingProcessor<TestTask>(1000, 100) {
-                    @Override
-                    protected void processBatchingTasks(List<BatchingTask<TestTask>> batchingTasks) {
-                        // adding some random delay to simulate realistic usage
-                        try {
-                            Thread.sleep(rand.nextInt(10));
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                            throw new RuntimeException(e);
-                        }
-                        batchingTasks.forEach(batchingTask -> batchingTask.completion().complete());
-                    }
-                }
-            ))
-            .propertySupplier(StaticPropertySupplier.of(
-                Property.ofStatic(ProcessorProperties.CONFIG_PARTITION_CONCURRENCY, 16)
-            ))
-            .build()
-            .run();
+                .builder(rule)
+                .configureProcessorsBuilder(builder -> builder
+                        .thenProcess(processorPropertiesSupplier -> new BatchingProcessor<TestTask>(
+                                processorPropertiesSupplier) {
+                            @Override
+                            protected void processBatchingTasks(
+                                    List<BatchingTask<TestTask>> batchingTasks) {
+                                // adding some random delay to simulate realistic usage
+                                try {
+                                    Thread.sleep(rand.nextInt(10));
+                                } catch (InterruptedException e) {
+                                    Thread.currentThread().interrupt();
+                                    throw new RuntimeException(e);
+                                }
+                                batchingTasks
+                                        .forEach(batchingTask ->
+                                                         batchingTask.completion()
+                                                                     .complete());
+                            }
+                        }))
+                .propertySupplier(StaticPropertySupplier.of(
+                        Property.ofStatic(ProcessorProperties.CONFIG_PARTITION_CONCURRENCY, 16),
+                        Property.ofStatic(ProcessorProperties.CONFIG_BATCHING_PROCESSOR_LINGER_MS, 1000L),
+                        Property.ofStatic(ProcessorProperties.CONFIG_BATCHING_PROCESSOR_CAPACITY, 1000)
+                ))
+                .build()
+                .run();
     }
 }

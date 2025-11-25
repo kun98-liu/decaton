@@ -22,11 +22,14 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Supplier;
 
 import com.linecorp.decaton.processor.DecatonProcessor;
 import com.linecorp.decaton.processor.DeferredCompletion;
 import com.linecorp.decaton.processor.ProcessingContext;
 import com.linecorp.decaton.processor.Completion;
+import com.linecorp.decaton.processor.runtime.ProcessorProperties;
+import com.linecorp.decaton.processor.runtime.Property;
 import com.linecorp.decaton.processor.runtime.internal.Utils;
 
 import lombok.Value;
@@ -42,8 +45,8 @@ public abstract class BatchingProcessor<T> implements DecatonProcessor<T> {
 
     private final ScheduledExecutorService executor;
     private List<BatchingTask<T>> currentBatch = new ArrayList<>();
-    private final long lingerMillis;
-    private final int capacity;
+    private Property<Long> lingerMillis;
+    private Property<Integer> capacity;
     private final ReentrantLock rollingLock;
 
     @Value
@@ -56,14 +59,16 @@ public abstract class BatchingProcessor<T> implements DecatonProcessor<T> {
 
     /**
      * Instantiate {@link BatchingProcessor}.
-     * @param lingerMillis time limit for this processor. On every lingerMillis milliseconds,
-     * tasks in past lingerMillis milliseconds are pushed to {@link BatchingTask#processBatchingTasks(List)}.
-     * @param capacity size limit for this processor. Every time tasks’size reaches capacity,
-     * tasks in past before reaching capacity are pushed to {@link BatchingTask#processBatchingTasks(List)}.
+     * Uses the following properties from ProcessorProperties:
+     * - {@link ProcessorProperties#CONFIG_BATCHING_PROCESSOR_LINGER_MS}: time limit for this processor. 
+     *   On every lingerMillis milliseconds, tasks in past lingerMillis milliseconds are pushed to {@link BatchingTask#processBatchingTasks(List)}.
+     * - {@link ProcessorProperties#CONFIG_BATCHING_PROCESSOR_CAPACITY}: size limit for this processor. 
+     *   Every time tasks'size reaches capacity, tasks in past before reaching capacity are pushed to {@link BatchingTask#processBatchingTasks(List)}.
      */
-    protected BatchingProcessor(long lingerMillis, int capacity) {
-        this.lingerMillis = lingerMillis;
-        this.capacity = capacity;
+    protected BatchingProcessor(Supplier<ProcessorProperties> processorPropertiesSupplier) {
+        ProcessorProperties properties = processorPropertiesSupplier.get();
+        this.lingerMillis = properties.get(ProcessorProperties.CONFIG_BATCHING_PROCESSOR_LINGER_MS);
+        this.capacity = properties.get(ProcessorProperties.CONFIG_BATCHING_PROCESSOR_CAPACITY);
 
         ScheduledThreadPoolExecutor scheduledExecutor = new ScheduledThreadPoolExecutor(
             1,
@@ -108,14 +113,14 @@ public abstract class BatchingProcessor<T> implements DecatonProcessor<T> {
     }
 
     private void scheduleFlush() {
-        executor.schedule(this::periodicallyFlushTask, lingerMillis, TimeUnit.MILLISECONDS);
+        executor.schedule(this::periodicallyFlushTask, lingerMillis.value(), TimeUnit.MILLISECONDS);
     }
 
     @Override
     public void process(ProcessingContext<T> context, T task) throws InterruptedException {
         rollingLock.lock();
         try {
-            if (currentBatch.size() >= this.capacity) {
+            if (currentBatch.size() >= this.capacity.value()) {
                 final List<BatchingTask<T>> batch = currentBatch;
                 executor.submit(() -> processBatchingTasks(batch));
                 currentBatch = new ArrayList<>();
